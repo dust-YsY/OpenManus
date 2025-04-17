@@ -2,7 +2,10 @@ import asyncio
 
 from app.agent.manus import Manus
 from app.logger import logger
+import os
 
+os.environ["http_proxy"] = "http://127.0.0.1:7897"
+os.environ["https_proxy"] = "http://127.0.0.1:7897"
 
 async def main():
     agent = Manus()

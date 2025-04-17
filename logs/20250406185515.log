@@ -1,0 +1,4 @@
+2025-04-06 18:55:25.441 | INFO     | __main__:initialize:25 - Initializing MCPAgent with stdio connection...
+2025-04-06 18:55:58.645 | INFO     | app.tool.mcp:disconnect:115 - Disconnected from MCP server
+2025-04-06 18:55:58.645 | INFO     | app.agent.mcp:cleanup:176 - MCP connection closed
+2025-04-06 18:55:58.645 | INFO     | __main__:cleanup:66 - Session ended

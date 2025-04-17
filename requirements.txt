@@ -39,3 +39,12 @@ beautifulsoup4~=4.13.3
 
 huggingface-hub~=0.29.2
 setuptools~=75.8.0
+
+# 向量数据库和嵌入相关
+sentence-transformers~=2.2.2
+# 使用 chromadb 替代 faiss-cpu
+chromadb~=0.5.0
+# 指定更新版本的 langchain-community，它兼容较新的 langchain-core
+langchain-community>=0.2.0
+langchain-core>=0.3.35,<0.4.0
+langchain-text-splitters>=0.2.0

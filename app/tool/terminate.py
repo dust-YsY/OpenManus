@@ -12,7 +12,7 @@ class Terminate(BaseTool):
         "type": "object",
         "properties": {
             "status": {
-                "type": "string",
+                "type": "string",  
                 "description": "The finish status of the interaction.",
                 "enum": ["success", "failure"],
             }
