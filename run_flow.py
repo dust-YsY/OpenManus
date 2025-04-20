@@ -1,14 +1,20 @@
 import asyncio
+import os
 import time
 
+from app.agent.knowledge_base import KnowledgeBaseAgent
 from app.agent.manus import Manus
 from app.flow.flow_factory import FlowFactory, FlowType
 from app.logger import logger
 
+os.environ["http_proxy"] = "http://127.0.0.1:7897"
+os.environ["https_proxy"] = "http://127.0.0.1:7897"
+
 
 async def run_flow():
     agents = {
-        "manus": Manus(),
+        # "manus": Manus(),
+        "knowledge_base": KnowledgeBaseAgent(),
     }
 
     try:

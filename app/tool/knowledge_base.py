@@ -106,17 +106,16 @@ class KnowledgeBaseManager:
             texts, normalize_embeddings=True
         )  # 使用模型编码文本并规范化嵌入
 
-    def create_index(self, source_path: str, index_name: Optional[str] = None) -> str:
+    def create_index(self, index_name: Optional[str] = None) -> str:
         """Create a new vector index from documents.
 
         Args:
-            source_path: Path to file or directory containing documents
             index_name: Optional name for the index. If not provided, a UUID will be generated.
 
         Returns:
             The ID of the created index
         """
-        source_path = Path(source_path)  # 转换源路径为Path对象
+        source_path = Path(self.indexes_dir)  # 转换源路径为Path对象
         if not source_path.exists():  # 检查源路径是否存在
             raise FileNotFoundError(
                 f"Source path {source_path} does not exist"
@@ -129,7 +128,7 @@ class KnowledgeBaseManager:
         index_dir = self.indexes_dir / index_id  # 确定索引存储目录
 
         # Load and process documents
-        documents = self._load_documents(source_path)  # 加载并处理文档
+        documents = self._load_documents(self.documents_dir)  # 加载并处理文档
         if not documents:  # 如果没有找到文档
             raise ValueError(f"No documents found at {source_path}")  # 抛出值错误
 
@@ -292,10 +291,6 @@ Available commands:
                 ],  # 可用命令枚举
                 "description": "The operation to perform on the knowledge base",
             },
-            "source_path": {  # 源路径参数
-                "type": "string",
-                "description": "Path to document or directory to index (for create_index)",
-            },
             "index_name": {  # 索引名称参数
                 "type": "string",
                 "description": "Name for the index (optional for create_index)",
@@ -332,7 +327,6 @@ Available commands:
     async def execute(
         self,
         command: str,
-        source_path: Optional[str] = None,
         index_name: Optional[str] = None,
         index_id: Optional[str] = None,
         query_text: Optional[str] = None,
@@ -342,13 +336,9 @@ Available commands:
         """Execute the knowledge base tool with specified parameters."""  # 使用指定参数执行知识库工具
         try:
             if command == "create_index":  # 如果命令是创建索引
-                if not source_path:  # 检查源路径是否提供
-                    return ToolResult(
-                        error="source_path is required for create_index command"
-                    )  # 返回错误结果
 
                 index_id = self.kb_manager.create_index(
-                    source_path, index_name
+                    index_name
                 )  # 创建索引
                 return ToolResult(
                     output=f"Created knowledge base index: {index_id}"

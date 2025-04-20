@@ -43,7 +43,6 @@ async def knowledge_base_demo():
             name="knowledge_base",
             tool_input={
                 "command": "create_index",
-                "source_path": str(samples_dir),
                 "index_name": "semantic_search_demo"
             }
         )

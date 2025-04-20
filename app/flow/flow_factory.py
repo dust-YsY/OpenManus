@@ -28,7 +28,6 @@ class FlowFactory:
         flow_class = flows.get(flow_type)  # 根据流程类型获取对应的流程类
         if not flow_class:  # 如果找不到对应的流程类
             raise ValueError(f"Unknown flow type: {flow_type}")  # 抛出ValueError异常
-
         return flow_class(
             agents, **kwargs
         )  # 使用提供的代理和其他参数创建并返回流程实例

@@ -106,7 +106,6 @@ result = await agent.available_tools.execute(
     name="knowledge_base",
     tool_input={
         "command": "create_index",
-        "source_path": "path/to/documents",
         "index_name": "my_knowledge"  # 可选，如果不提供会生成UUID
     }
 )
@@ -165,7 +164,6 @@ await agent.available_tools.execute(
     name="knowledge_base",
     tool_input={
         "command": "create_index",
-        "source_path": "workspace/my_notes",
         "index_name": "personal_notes"
     }
 )
@@ -189,7 +187,6 @@ await agent.available_tools.execute(
     name="knowledge_base",
     tool_input={
         "command": "create_index",
-        "source_path": "workspace/technical_docs",
         "index_name": "tech_docs"
     }
 )

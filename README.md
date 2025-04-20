@@ -25,19 +25,20 @@
     - [总结](#总结)
       - [技术特点](#技术特点)
       - [设计模式应用](#设计模式应用)
+  - [部署与使用](#部署与使用)
+    - [直接使用](#直接使用)
+    - [工作流模式](#工作流模式)
+    - [配置项](#配置项)
   - [实践：RAG工具实现——KnowledgeBaseTool](#实践rag工具实现knowledgebasetool)
     - [实现原理](#实现原理)
       - [1. KnowledgeBaseManager](#1-knowledgebasemanager)
       - [2. 文档处理流程](#2-文档处理流程)
       - [3. 查询机制](#3-查询机制)
       - [4. 工具接口](#4-工具接口)
-    - [技术优势](#技术优势)
+    - [技术特点](#技术特点-1)
     - [应用场景](#应用场景)
     - [与其他工具的协同](#与其他工具的协同)
-  - [部署与使用](#部署与使用)
-    - [直接使用](#直接使用)
-    - [工作流模式](#工作流模式)
-    - [配置项](#配置项)
+    - [使用示例](#使用示例)
 
 ## 概述
 
@@ -1337,7 +1338,7 @@ PlanningFlow实现了基于计划的执行流程：
 
 ### 总结
 
-本章详细分析了OpenManus项目的核心代码实现，主要包含以下几个关键部分：
+本节分析了OpenManus项目的核心代码实现，主要包含以下几个关键部分：
 1. **核心数据结构**
 - **消息系统**：基于Pydantic实现了完整的对话交互结构，包括角色定义、工具调用模型和消息模型
 - **配置管理**：支持环境变量、配置文件和工作空间管理，提供灵活的配置机制
@@ -1364,12 +1365,56 @@ PlanningFlow实现了基于计划的执行流程：
 4. **扩展性**：通过工厂模式和抽象基类支持功能扩展
 5. **资源管理**：实现了完善的资源初始化和清理机制
 #### 设计模式应用
-- **工厂模式**：用于创建不同类型的流程
-- **策略模式**：支持不同的工具选择和执行策略
-- **观察者模式**：用于状态监控和事件处理
-- **模板方法模式**：在Agent基类中定义执行流程
-- **组合模式**：用于工具集合的管理
+1. **工厂模式**
+- 在`FlowFactory`中实现，用于创建不同类型的流程实例
+- 通过`FlowType`枚举和映射表实现流程类型的解耦
+- 支持动态添加新的流程类型，符合开闭原则
 
+2. **模板方法模式**
+- 在`BaseAgent`中定义，通过`step()`抽象方法定义执行流程
+- 子类如`ReActAgent`、`ToolCallAgent`实现具体的执行逻辑
+- 在`BaseFlow`中定义`execute()`抽象方法，子类实现具体流程
+
+3. **策略模式**
+- 在`ToolCallAgent`中实现，支持不同的工具选择策略（AUTO/NONE/REQUIRED）
+- 在`PlanningFlow`中实现，支持不同的执行器选择策略
+- 在`LLM`类中实现，支持不同的语言模型后端
+4. **适配器模式**
+- 在`LLM`类中实现，统一不同语言模型后端的接口
+- 在`MCPAgent`中实现，适配不同的连接方式（SSE/stdio）
+5. **观察者模式**
+- 在`Memory`类中实现，用于消息的添加和通知
+- 在`MCPAgent`中实现，用于监控服务状态变化
+- 在`PlanningFlow`中实现，用于监控计划执行进度
+
+## 部署与使用
+
+OpenManus 提供两种主要使用方式：
+
+### 直接使用
+
+通过 `main.py` 直接与单一代理交互：
+
+```bash
+python main.py
+```
+
+### 工作流模式
+
+使用 `run_flow.py` 以工作流模式运行，支持多代理协作：
+
+```bash
+python run_flow.py
+```
+
+### 配置项
+
+系统关键配置项包括：
+
+- LLM 接入设置
+- 工具配置
+- 代理参数设置
+- 工作目录设置
 
 ## 实践：RAG工具实现——KnowledgeBaseTool
 
@@ -1377,7 +1422,7 @@ PlanningFlow实现了基于计划的执行流程：
 
 ### 实现原理
 
-KnowledgeBaseTool 建立在现代文本嵌入和向量数据库技术之上，主要包含以下核心组件：
+KnowledgeBaseTool 建立在文本嵌入和向量数据库技术之上，主要包含以下核心功能：
 
 ```mermaid
 graph TD
@@ -1410,43 +1455,49 @@ graph TD
 
 #### 1. KnowledgeBaseManager
 
-负责核心功能实现，包括：
+负责知识库的核心操作管理，包括：
 
-- 文档加载和处理
-- 文本向量化
-- 索引创建和管理
-- 相似性搜索
+- 使用SentenceTransformer进行文本向量化
+- 通过Chroma实现向量存储和检索
+- 支持多种文档格式的加载和处理
 
 ```python
 class KnowledgeBaseManager:
-    """负责管理本地知识库操作"""
-
     def __init__(self, base_path: Optional[str] = None):
         # 初始化文本嵌入模型
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
-        # 索引存储
-        self.loaded_indexes = {}
+        # 设置基础目录结构
+        self.base_path = Path(base_path or os.path.join(config.workspace_root, "knowledge_base"))
+        self.indexes_dir = self.base_path / "indexes"
+        self.documents_dir = self.base_path / "documents"
 
-        # 文本分割器
+        # 配置文本分割器
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200,
         )
+
+        # 文档加载器映射
+        self.loader_map = {
+            ".txt": TextLoader,
+            ".md": UnstructuredMarkdownLoader,
+            ".pdf": PyPDFLoader,
+            ".csv": CSVLoader,
+        }
 ```
 
 #### 2. 文档处理流程
 
 文档处理涉及以下步骤：
 
-1. **加载文档**：使用适当的加载器读取不同格式的文档
-2. **分割文本**：将长文档分割成适当大小的文本块
-3. **生成嵌入**：将文本块转换为向量表示
-4. **存储索引**：将向量和原始文本保存到Chroma数据库
+- 支持多种文档格式（txt、md、pdf、csv）
+- 使用LangChain的文档加载器进行内容提取
+- 通过RecursiveCharacterTextSplitter进行文本分块
+- 生成向量表示并存储到Chroma数据库
 
 ```python
 def create_index(self, source_path: str, index_name: Optional[str] = None) -> str:
-    """创建新的向量索引"""
     # 加载文档
     documents = self._load_documents(Path(source_path))
 
@@ -1468,12 +1519,12 @@ def create_index(self, source_path: str, index_name: Optional[str] = None) -> st
 
 查询过程利用向量相似性来找出与问题语义最相关的文本：
 
+- 支持语义相似度搜索
+- 返回相关度分数和元数据
+- 可配置返回结果数量（top_k）
+
 ```python
 def query(self, index_id: str, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
-    """查询索引"""
-    # 加载索引
-    chroma_db = self.loaded_indexes[index_id]
-
     # 执行相似性搜索
     results = chroma_db.similarity_search_with_relevance_scores(query, k=top_k)
 
@@ -1491,77 +1542,131 @@ def query(self, index_id: str, query: str, top_k: int = 5) -> List[Dict[str, Any
 
 KnowledgeBaseTool 提供了四个主要命令：
 
+- create_index：创建新的知识库索引
+- list_indexes：列出所有可用索引
+- query：执行语义搜索
+- delete_index：删除指定索引
+
 ```python
-async def execute(
-    self,
-    command: str,  # "create_index", "list_indexes", "query", "delete_index"
-    source_path: Optional[str] = None,
-    index_name: Optional[str] = None,
-    index_id: Optional[str] = None,
-    query_text: Optional[str] = None,
-    top_k: int = 5,
-    **kwargs
-) -> ToolResult:
-    """执行知识库工具命令"""
+class KnowledgeBaseTool(BaseTool):
+    name: str = "knowledge_base"
+    description: str = """Manage and query local knowledge bases.
+Available commands:
+- create_index: Create a new knowledge base index from documents
+- list_indexes: List all available knowledge base indexes
+- query: Search a knowledge base with a text query
+- delete_index: Delete a knowledge base index
+"""
 ```
 
-### 技术优势
+### 技术特点
 
-KnowledgeBaseTool 带来的核心优势：
+1. **语义理解能力**
+   - 使用预训练的all-MiniLM-L6-v2模型
+   - 支持384维的向量表示
+   - 提供高质量的语义相似度计算
 
-1. **语义理解**：基于文本嵌入的搜索超越了传统关键词匹配，能够理解查询的语义意图。
+2. **多格式支持**
+   - 内置多种文档加载器
+   - 支持常见文档格式
+   - 可扩展的加载器映射机制
 
-2. **多格式支持**：统一处理多种文档格式，包括PDF、文本、CSV、Markdown等。
+3. **本地化处理**
+   - 所有数据存储在本地
+   - 支持离线操作
+   - 确保数据隐私和安全
 
-3. **本地化**：所有数据和处理都在本地完成，保证数据隐私和安全。
-
-4. **高效检索**：向量相似性搜索提供更相关的结果，即使没有精确关键词匹配。
+4. **高效检索**
+   - 基于向量相似度的快速搜索
+   - 支持批量文档处理
+   - 优化的内存管理
 
 ### 应用场景
 
-KnowledgeBaseTool 特别适合以下场景：
+1. **私有文档问答**
+   - 基于公司文档、研究论文或技术文献回答问题
+   - 支持多文档联合检索
+   - 提供相关度评分
 
-1. **私有文档问答**：基于公司文档、研究论文或技术文献回答问题
+2. **领域知识增强**
+   - 为Agent提供特定领域的深入知识
+   - 支持知识库的动态更新
+   - 实现知识的持久化存储
 
-2. **领域知识增强**：为代理提供特定领域的深入知识
+3. **个性化助手**
+   - 基于用户个人文档集建立定制化知识库
+   - 支持个性化知识检索
+   - 提供上下文相关的回答
 
-3. **个性化助手**：基于用户个人文档集建立定制化知识库
-
-4. **离线信息检索**：在无网络或限制环境中提供信息检索能力
+4. **离线信息检索**
+   - 在无网络环境中提供信息检索能力
+   - 支持本地知识库的快速查询
+   - 确保数据访问的可靠性
 
 ### 与其他工具的协同
 
-KnowledgeBaseTool 可以与系统中的其他工具协同工作：
+KnowledgeBaseTool可以与OpenManus中的其他工具协同工作：
 
-- 与**规划工具**配合，在执行计划中加入知识检索步骤
-- 与**Python执行工具**配合，对检索到的数据进行处理
-- 与**浏览器工具**配合，验证或补充从知识库获取的信息
+1. **与规划工具配合**
+   - 在执行计划中加入知识检索步骤
+   - 基于检索结果调整执行策略
+   - 提供知识支持的决策制定
 
-## 部署与使用
+2. **与Python执行工具配合**
+   - 对检索到的数据进行处理和分析
+   - 实现复杂的数据转换和计算
+   - 支持自定义的数据处理流程
 
-OpenManus 提供两种主要使用方式：
+3. **与浏览器工具配合**
+   - 验证或补充从知识库获取的信息
+   - 实现知识库内容的动态更新
+   - 支持在线资源的整合
 
-### 直接使用
+### 使用示例
 
-通过 `main.py` 直接与单一代理交互：
-
-```bash
-python main.py
+1. **创建知识库索引**
+```python
+result = await agent.available_tools.execute(
+    name="knowledge_base",
+    tool_input={
+        "command": "create_index",
+        "source_path": "path/to/documents",
+        "index_name": "my_knowledge"
+    }
+)
 ```
 
-### 工作流模式
-
-使用 `run_flow.py` 以工作流模式运行，支持多代理协作：
-
-```bash
-python run_flow.py
+2. **查询知识库**
+```python
+result = await agent.available_tools.execute(
+    name="knowledge_base",
+    tool_input={
+        "command": "query",
+        "index_id": "my_knowledge",
+        "query_text": "语义搜索的优势是什么?",
+        "top_k": 3
+    }
+)
 ```
 
-### 配置项
+3. **管理知识库**
+```python
+# 列出所有索引
+result = await agent.available_tools.execute(
+    name="knowledge_base",
+    tool_input={
+        "command": "list_indexes"
+    }
+)
 
-系统关键配置项包括：
+# 删除索引
+result = await agent.available_tools.execute(
+    name="knowledge_base",
+    tool_input={
+        "command": "delete_index",
+        "index_id": "my_knowledge"
+    }
+)
+```
 
-- LLM 接入设置
-- 工具配置
-- 代理参数设置
-- 工作目录设置
+
