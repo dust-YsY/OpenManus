@@ -71,6 +71,37 @@ class KnowledgeBaseManager:
             ".csv": CSVLoader,  # CSV文件使用CSVLoader
         }
 
+        # Create embedding function that supports both documents and queries
+        class EmbeddingFunction:
+            def __init__(self, model):
+                self.model = model
+
+            def __call__(self, texts):
+                embeddings = self.model.encode(texts, normalize_embeddings=True)
+                return (
+                    embeddings.tolist()
+                    if isinstance(embeddings, np.ndarray)
+                    else embeddings
+                )
+
+            def embed_query(self, text):
+                embedding = self.model.encode(text, normalize_embeddings=True)
+                return (
+                    embedding.tolist()
+                    if isinstance(embedding, np.ndarray)
+                    else embedding
+                )
+
+            def embed_documents(self, texts):
+                embeddings = self.model.encode(texts, normalize_embeddings=True)
+                return (
+                    embeddings.tolist()
+                    if isinstance(embeddings, np.ndarray)
+                    else embeddings
+                )
+
+        self.embedding_function = EmbeddingFunction(self.model)
+
     def _get_file_loader(self, file_path: Path):
         """Get the appropriate document loader based on file extension."""  # 根据文件扩展名获取适当的文档加载器
         extension = file_path.suffix.lower()  # 获取小写的文件扩展名
@@ -115,45 +146,36 @@ class KnowledgeBaseManager:
         Returns:
             The ID of the created index
         """
-        source_path = Path(self.indexes_dir)  # 转换源路径为Path对象
-        if not source_path.exists():  # 检查源路径是否存在
-            raise FileNotFoundError(
-                f"Source path {source_path} does not exist"
-            )  # 如果不存在，抛出文件未找到错误
-
         # Generate an index ID or use provided name
-        index_id = index_name or str(
-            uuid.uuid4()
-        )  # 使用提供的索引名称或生成UUID作为索引ID
-        index_dir = self.indexes_dir / index_id  # 确定索引存储目录
+        index_id = index_name or str(uuid.uuid4())
+        index_dir = self.indexes_dir / index_id
 
         # Load and process documents
-        documents = self._load_documents(self.documents_dir)  # 加载并处理文档
-        if not documents:  # 如果没有找到文档
-            raise ValueError(f"No documents found at {source_path}")  # 抛出值错误
-
-        # Create embedding function wrapper
-        embedding_function = lambda texts: self.model.encode(  # 创建嵌入函数包装器
-            texts, normalize_embeddings=True  # 规范化嵌入向量
-        )
+        try:
+            documents = self._load_documents(self.documents_dir)
+            if not documents:
+                raise ValueError(f"No documents found in {self.documents_dir}")
+        except Exception as e:
+            raise ValueError(f"Failed to load documents: {str(e)}")
 
         # Create Chroma collection
-        chroma_db = Chroma.from_documents(  # 从文档创建Chroma集合
-            documents=documents,  # 文档列表
-            embedding=embedding_function,  # 嵌入函数
-            persist_directory=str(index_dir),  # 持久化目录
-            collection_name=index_id,  # 集合名称
-        )
+        try:
+            chroma_db = Chroma.from_documents(
+                documents=documents,
+                embedding=self.embedding_function,
+                persist_directory=str(index_dir),
+                collection_name=index_id,
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to create Chroma collection: {str(e)}")
 
         # Add to loaded indexes
-        self.loaded_indexes[index_id] = (
-            chroma_db  # 将新创建的索引添加到已加载索引字典中
-        )
+        self.loaded_indexes[index_id] = chroma_db
 
         logger.info(
             f"Created knowledge base index '{index_id}' with {len(documents)} chunks"
-        )  # 记录创建索引的信息
-        return index_id  # 返回索引ID
+        )
+        return index_id
 
     def list_indexes(self) -> List[str]:
         """List all available indexes."""  # 列出所有可用的索引
@@ -170,33 +192,26 @@ class KnowledgeBaseManager:
         Returns:
             True if loaded successfully, False otherwise
         """
-        index_dir = self.indexes_dir / index_id  # 确定索引目录
-        if not index_dir.exists():  # 检查索引目录是否存在
-            return False  # 如果不存在，返回False
+        index_dir = self.indexes_dir / index_id
+        if not index_dir.exists():
+            return False
 
-        if index_id in self.loaded_indexes:  # 检查索引是否已经加载
-            return True  # 如果已加载，返回True
+        if index_id in self.loaded_indexes:
+            return True
 
         try:
-            # Create embedding function wrapper
-            embedding_function = lambda texts: self.model.encode(  # 创建嵌入函数包装器
-                texts, normalize_embeddings=True  # 规范化嵌入向量
+            # Load Chroma collection using the same embedding function
+            chroma_db = Chroma(
+                persist_directory=str(index_dir),
+                embedding_function=self.embedding_function,
+                collection_name=index_id,
             )
 
-            # Load Chroma collection
-            chroma_db = Chroma(  # 加载Chroma集合
-                persist_directory=str(index_dir),  # 持久化目录
-                embedding_function=embedding_function,  # 嵌入函数
-                collection_name=index_id,  # 集合名称
-            )
-
-            self.loaded_indexes[index_id] = (
-                chroma_db  # 将加载的索引添加到已加载索引字典中
-            )
-            return True  # 返回加载成功
-        except Exception as e:  # 捕获任何异常
-            logger.error(f"Failed to load index {index_id}: {e}")  # 记录加载失败的错误
-            return False  # 返回加载失败
+            self.loaded_indexes[index_id] = chroma_db
+            return True
+        except Exception as e:
+            logger.error(f"Failed to load index {index_id}: {e}")
+            return False
 
     def query(self, index_id: str, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """Query an index with a text query.
@@ -210,31 +225,30 @@ class KnowledgeBaseManager:
             List of results with document content and metadata
         """
         # Ensure index is loaded
-        if index_id not in self.loaded_indexes:  # 检查索引是否已加载
-            if not self.load_index(index_id):  # 尝试加载索引
-                raise ValueError(
-                    f"Index {index_id} not found"
-                )  # 如果加载失败，抛出值错误
+        if index_id not in self.loaded_indexes:
+            if not self.load_index(index_id):
+                raise ValueError(f"Index {index_id} not found")
 
-        chroma_db = self.loaded_indexes[index_id]  # 获取已加载的索引
+        chroma_db = self.loaded_indexes[index_id]
 
         # Query the index
-        results = chroma_db.similarity_search_with_relevance_scores(
-            query, k=top_k
-        )  # 执行相似性搜索，返回相关度分数
+        try:
+            results = chroma_db.similarity_search_with_relevance_scores(query, k=top_k)
+        except Exception as e:
+            raise ValueError(f"Failed to query index: {str(e)}")
 
         # Format results
-        formatted_results = []  # 初始化格式化结果列表
-        for doc, score in results:  # 遍历搜索结果
+        formatted_results = []
+        for doc, score in results:
             formatted_results.append(
-                {  # 添加格式化结果
-                    "content": doc.page_content,  # 文档内容
-                    "metadata": doc.metadata,  # 文档元数据
-                    "score": float(score),  # 将numpy浮点数转换为Python浮点数
+                {
+                    "content": doc.page_content,
+                    "metadata": doc.metadata,
+                    "score": float(score),
                 }
             )
 
-        return formatted_results  # 返回格式化结果列表
+        return formatted_results
 
     def delete_index(self, index_id: str) -> bool:
         """Delete an index.
@@ -337,9 +351,7 @@ Available commands:
         try:
             if command == "create_index":  # 如果命令是创建索引
 
-                index_id = self.kb_manager.create_index(
-                    index_name
-                )  # 创建索引
+                index_id = self.kb_manager.create_index(index_name)  # 创建索引
                 return ToolResult(
                     output=f"Created knowledge base index: {index_id}"
                 )  # 返回成功结果

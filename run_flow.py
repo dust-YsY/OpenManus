@@ -24,6 +24,7 @@ async def run_flow():
             logger.warning("Empty prompt provided.")
             return
 
+        # 创建Flow对象
         flow = FlowFactory.create_flow(
             flow_type=FlowType.PLANNING,
             agents=agents,

@@ -1,0 +1,34 @@
+
+
+Table of Contents
+
+1. [Overview](#overview)
+2. [Key Features](#key-features)
+3. [Use Cases](#use-cases)
+4. [Benefits](#benefits)
+
+OpenManus Local Knowledge Base Feature
+
+
+Overview
+
+Enhance your AI assistant with custom documents using OpenManus’s Local Knowledge Base. Leveraging semantic search, it retrieves answers contextually—not just by keywords.
+
+Key Features
+
+✅ Multi-Format Support: Upload Markdown, PDF, TXT, or CSV files.
+✅ Smart Search: Powered by AI embeddings (e.g., BERT) and FAISS for speed.
+✅ Easy Management: Create, update, or delete knowledge bases in seconds.
+✅ Seamless Integration: Works natively with OpenManus tools.
+
+Use Cases
+
+- Developers: Instantly fetch API docs or code snippets.
+- Support Teams: Auto-reply using FAQs/manuals.
+- Researchers: Link papers/datasets for insights.
+
+Benefits
+
+- ⏱️ Saves time with instant, accurate searches.
+- 🎯 Outperforms keyword search by understanding intent.
+- 🛠️ No-code setup for all skill levels.

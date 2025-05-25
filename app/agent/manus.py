@@ -33,7 +33,7 @@ class Manus(ToolCallAgent):
             PythonExecute(),  # Python执行工具
             BrowserUseTool(),  # 浏览器使用工具
             StrReplaceEditor(),  # 字符串替换编辑器工具
-            KnowledgeBaseTool(),  # 知识库工具
+            # KnowledgeBaseTool(),  # 知识库工具
             Terminate()  # 终止工具
         )
     )

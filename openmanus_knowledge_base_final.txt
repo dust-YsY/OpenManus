@@ -1,0 +1,18 @@
+OpenManus Local Knowledge Base Feature
+
+Overview: Add your own documents (PDFs, Markdown, etc.) for AI-powered searches that understand meaning.
+
+Key Features:
+- Supports PDF, Markdown, TXT, CSV.
+- AI-driven semantic search.
+- Easy to set up and manage.
+
+Use Cases:
+- Developers: Find API docs or code snippets quickly.
+- Support Teams: Answer customer questions automatically.
+- Legal Teams: Search contracts for specific clauses.
+
+Benefits:
+- Saves time vs. manual searches.
+- More accurate than keyword tools.
+- No technical skills needed.

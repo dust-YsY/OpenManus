@@ -150,14 +150,14 @@ class PlanningFlow(BaseFlow):
         """Create an initial plan based on the request using the flow's LLM and PlanningTool."""
         logger.info(f"Creating initial plan with ID: {self.active_plan_id}")
 
-        # 创建计划创建的系统消息
+        # 创建计划 系统 prompt
         system_message = Message.system_message(
             "You are a planning assistant. Create a concise, actionable plan with clear steps. "
             "Focus on key milestones rather than detailed sub-steps. "
             "Optimize for clarity and efficiency."
         )
 
-        # 创建带有请求的用户消息
+        # 创建机会 用户消息
         user_message = Message.user_message(
             f"Create a reasonable plan with clear steps to accomplish the task: {request}"
         )
